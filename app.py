@@ -1367,58 +1367,39 @@ if page == "💼 Портфель":
     balance = get_balance()
     total = current_value + balance
 
-        # --- НОВЫЙ БЛОК СТАТИСТИКИ ---
-    # Стоимость актив (самое главное) и рядом надпись Мои активы
-    col_assets, col_label = st.columns([3, 1])
-    with col_assets:
-        st.metric("Стоимость активов", f"{current_value:,.2f} ₽")
-    with col_label:
-        st.markdown("<div style='text-align: right; color: gray; margin-top: 20px;'>📊 Мои активы</div>", unsafe_allow_html=True)
-    
-    # Две строчки в один ряд: Инвестировано и Итого (Текущий баланс)
-    col_inv, col_total = st.columns(2)
-    with col_inv:
-        st.metric("Всего инвестировано", f"{total_invested:,.2f} ₽")
-    with col_total:
-        st.metric("Текущий баланс", f"{total:,.2f} ₽") # Итого переименовали в Текущий баланс
-        
-    st.markdown("---")
-    # Свободные деньги над кнопками
-    st.metric("Свободный баланс", f"{balance:,.2f} ₽")
-    # ------------------------------
+    # 4 карточки в ряд с короткими названиями
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Инвестировано", f"{total_invested:,.2f} ₽")
+    col2.metric("Стоимость", f"{current_value:,.2f} ₽")
+    col3.metric("Баланс", f"{balance:,.2f} ₽")
+    col4.metric("Итого", f"{total:,.2f} ₽")
 
     st.markdown("---")
 
+    # 3 кнопки в ряд
     col_dep, col_wd, col_refresh = st.columns(3)
-
     with col_dep:
         if st.button("➕ Пополнить", key="deposit_button", use_container_width=True):
             st.session_state.show_deposit_form = True
             st.session_state.show_withdraw_form = False
             st.rerun()
-
     with col_wd:
         if st.button("➖ Вывести", key="withdraw_button", use_container_width=True):
             st.session_state.show_withdraw_form = True
             st.session_state.show_deposit_form = False
             st.rerun()
-
     with col_refresh:
-        if st.button("🔄 Обновить цены", key="refresh_portfolio", use_container_width=True):
+        if st.button("🔄 Цены", key="refresh_portfolio", use_container_width=True):
             get_imoex.clear()
             get_stock_price.clear()
             st.rerun()
 
+    # Формы пополнения и вывода
     if st.session_state.get("show_deposit_form"):
         with st.form("deposit_form", clear_on_submit=True):
             st.markdown("**➕ Пополнение баланса**")
-            amount = st.number_input(
-                "Сумма, ₽",
-                value=0.0, step=100.0, format="%.2f",
-                key="deposit_amount"
-            )
+            amount = st.number_input("Сумма, ₽", value=0.0, step=100.0, format="%.2f", key="deposit_amount")
             comment = st.text_input("Комментарий", key="deposit_comment")
-
             c1, c2 = st.columns(2)
             with c1:
                 if st.form_submit_button("Пополнить", use_container_width=True):
@@ -1437,13 +1418,8 @@ if page == "💼 Портфель":
     if st.session_state.get("show_withdraw_form"):
         with st.form("withdraw_form", clear_on_submit=True):
             st.markdown("**➖ Вывод средств**")
-            amount = st.number_input(
-                "Сумма, ₽",
-                value=0.0, step=100.0, format="%.2f",
-                key="withdraw_amount"
-            )
+            amount = st.number_input("Сумма, ₽", value=0.0, step=100.0, format="%.2f", key="withdraw_amount")
             comment = st.text_input("Комментарий", key="withdraw_comment")
-
             c1, c2 = st.columns(2)
             with c1:
                 if st.form_submit_button("Вывести", use_container_width=True):
@@ -1460,6 +1436,8 @@ if page == "💼 Портфель":
                     st.rerun()
 
     st.markdown("---")
+    
+    # Блок с активами
     st.subheader("📊 Мои активы")
 
     if visible_purchases.empty and visible_sales.empty:
