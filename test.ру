@@ -1,0 +1,10 @@
+# Первый тест: проверяем формулу "До покупки"
+
+poslednyaya_cena = 8663.73       # последняя цена сделки
+orientir_pokupki = 98.69         # ориентир покупки
+kurs_cb = 85.4594                # курс ЦБ
+cena_procent = -0.009            # последняя цена сделки в % (-0,90% = -0.009)
+
+do_pokupki = (poslednyaya_cena / (orientir_pokupki * kurs_cb) - 1) - cena_procent
+
+print(f"До покупки: {do_pokupki * 100:.2f}%")
