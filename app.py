@@ -33,9 +33,22 @@ st.markdown("""
             padding-top: 1rem !important;
             gap: 0.5rem !important;
         }
-        /* Уменьшаем отступы у колонок */
+                /* Заставляем колонки не переноситься на новую строку */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 0.2rem !important;
+        }
+        /* Уменьшаем отступы и шрифт внутри колонок */
         [data-testid="column"] {
-            padding: 0 2px !important;
+            padding: 0px !important;
+            min-width: 0 !important;
+        }
+        [data-testid="stMetricValue"] {
+            font-size: 1.1rem !important; /* Уменьшили шрифт, чтобы цифры влезли */
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.7rem !important;
+            white-space: normal !important; /* Разрешаем перенос текста в заголовках */
         }
     }
 </style>
