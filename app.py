@@ -18,6 +18,13 @@ st.markdown("""
     
     /* Делаем метрики компактнее на телефоне */
     @media (max-width: 768px) {
+            /* Запрещаем горизонтальную прокрутку */
+        html, body {
+            overflow-x: hidden !important;
+        }
+        [data-testid="stAppViewContainer"] {
+            overflow-x: hidden !important;
+        }
         [data-testid="stMetric"] {
             margin-bottom: 0px !important;
             padding: 5px !important;
@@ -32,11 +39,6 @@ st.markdown("""
         .block-container {
             padding-top: 1rem !important;
             gap: 0.5rem !important;
-        }
-                /* Заставляем колонки не переноситься на новую строку */
-        [data-testid="stHorizontalBlock"] {
-            flex-wrap: nowrap !important;
-            gap: 0.2rem !important;
         }
         /* Уменьшаем отступы и шрифт внутри колонок */
         [data-testid="column"] {
@@ -1365,11 +1367,25 @@ if page == "💼 Портфель":
     balance = get_balance()
     total = current_value + balance
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Всего инвестировано", f"{total_invested:,.2f} ₽")
-    col2.metric("Текущая стоимость", f"{current_value:,.2f} ₽")
-    col3.metric("Баланс", f"{balance:,.2f} ₽")
-    col4.metric("Итого", f"{total:,.2f} ₽")
+        # --- НОВЫЙ БЛОК СТАТИСТИКИ ---
+    # Стоимость актив (самое главное) и рядом надпись Мои активы
+    col_assets, col_label = st.columns([3, 1])
+    with col_assets:
+        st.metric("Стоимость активов", f"{current_value:,.2f} ₽")
+    with col_label:
+        st.markdown("<div style='text-align: right; color: gray; margin-top: 20px;'>📊 Мои активы</div>", unsafe_allow_html=True)
+    
+    # Две строчки в один ряд: Инвестировано и Итого (Текущий баланс)
+    col_inv, col_total = st.columns(2)
+    with col_inv:
+        st.metric("Всего инвестировано", f"{total_invested:,.2f} ₽")
+    with col_total:
+        st.metric("Текущий баланс", f"{total:,.2f} ₽") # Итого переименовали в Текущий баланс
+        
+    st.markdown("---")
+    # Свободные деньги над кнопками
+    st.metric("Свободный баланс", f"{balance:,.2f} ₽")
+    # ------------------------------
 
     st.markdown("---")
 
