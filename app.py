@@ -12,6 +12,31 @@ st.markdown("""
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 0rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    /* Делаем метрики компактнее на телефоне */
+    @media (max-width: 768px) {
+        [data-testid="stMetric"] {
+            margin-bottom: 0px !important;
+            padding: 5px !important;
+        }
+        [data-testid="stMetricValue"] {
+            font-size: 1.5rem !important; /* Уменьшаем шрифт цифр */
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.8rem !important;
+        }
+        /* Убираем огромные отступы между блоками */
+        .block-container {
+            padding-top: 1rem !important;
+            gap: 0.5rem !important;
+        }
+        /* Уменьшаем отступы у колонок */
+        [data-testid="column"] {
+            padding: 0 2px !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1328,18 +1353,14 @@ if page == "💼 Портфель":
     total = current_value + balance
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Всего инвестировано", f"{total_invested:,.2f} ₽")
-    with col2:
-        st.metric("Текущая стоимость", f"{current_value:,.2f} ₽")
-    with col3:
-        st.metric("Баланс", f"{balance:,.2f} ₽")
-    with col4:
-        st.metric("Итого", f"{total:,.2f} ₽")
+    col1.metric("Всего инвестировано", f"{total_invested:,.2f} ₽")
+    col2.metric("Текущая стоимость", f"{current_value:,.2f} ₽")
+    col3.metric("Баланс", f"{balance:,.2f} ₽")
+    col4.metric("Итого", f"{total:,.2f} ₽")
 
     st.markdown("---")
 
-    col_dep, col_wd, col_refresh = st.columns([1, 1, 2])
+    col_dep, col_wd, col_refresh = st.columns(3)
 
     with col_dep:
         if st.button("➕ Пополнить", key="deposit_button", use_container_width=True):
