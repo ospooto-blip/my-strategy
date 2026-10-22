@@ -1837,6 +1837,11 @@ if page == "🟢 Покупки":
                     parent_id=parent_tx_id
                 )
 
+                # ОЧИЩАЕМ ПОЛЯ ВВОДА
+                for key in ["buy_query", "buy_ticker_select", "buy_price", "buy_quantity", "buy_imoex", "buy_commission", "buy_no_ticker"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
                 st.success(f"Добавлено: {selected_name or query}, {quantity} шт. (ID: {new_id})")
                 st.rerun()
 
@@ -2704,6 +2709,8 @@ if page == "📈 Индикатор":
         if st.button("Добавить актив", key="ind_add_button"):
             if selected_ticker is None:
                 st.warning("Выберите тикер")
+            elif not st.session_state.indicator.empty and selected_ticker in st.session_state.indicator["Тикер"].values:
+                st.error(f"❌ Актив {selected_ticker} уже есть в индикаторе!")
             else:
                 with st.spinner("Загрузка данных с MOEX..."):
                     auto_data = auto_fill_indicator_fields(selected_ticker)
@@ -2731,6 +2738,12 @@ if page == "📈 Индикатор":
                         ignore_index=True
                     )
                     save_indicator(st.session_state.indicator)
+                    
+                    # ОЧИЩАЕМ ПОЛЯ
+                    for key in ["ind_query", "ind_ticker_select"]:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                            
                     st.success(f"Добавлено: {selected_name or query}")
                     st.rerun()
 
@@ -2877,6 +2890,11 @@ if page == "📊 Активы к IMOEX":
                         tickers = st.session_state.assets_to_imoex["Тикер"].dropna().unique().tolist()
                         cache = refresh_history_cache(tickers, force=True)
                         st.session_state.history_cache = cache
+                        
+                    # ОЧИЩАЕМ ПОЛЯ
+                    for key in ["aimoex_query", "aimoex_ticker_select"]:
+                        if key in st.session_state:
+                            del st.session_state[key]
 
                     st.success(f"Добавлено и загружено: {selected_name or query}")
                     st.rerun()
