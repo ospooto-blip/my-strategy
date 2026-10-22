@@ -18,7 +18,6 @@ st.markdown("""
     
     /* Делаем метрики компактнее на телефоне */
     @media (max-width: 768px) {
-            /* Запрещаем горизонтальную прокрутку */
         html, body {
             overflow-x: hidden !important;
         }
@@ -30,27 +29,25 @@ st.markdown("""
             padding: 5px !important;
         }
         [data-testid="stMetricValue"] {
-            font-size: 1.5rem !important; /* Уменьшаем шрифт цифр */
+            font-size: 1.5rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.8rem !important;
         }
-        /* Убираем огромные отступы между блоками */
         .block-container {
             padding-top: 1rem !important;
             gap: 0.5rem !important;
         }
-        /* Уменьшаем отступы и шрифт внутри колонок */
         [data-testid="column"] {
             padding: 0px !important;
             min-width: 0 !important;
         }
         [data-testid="stMetricValue"] {
-            font-size: 1.1rem !important; /* Уменьшили шрифт, чтобы цифры влезли */
+            font-size: 1.1rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.7rem !important;
-            white-space: normal !important; /* Разрешаем перенос текста в заголовках */
+            white-space: normal !important;
         }
     }
 </style>
@@ -396,7 +393,6 @@ def restore_transaction(linked_id):
 
 # ============ КАСКАД ТРАНЗАКЦИЙ ============
 def _as_int(value):
-    """Безопасно приводит значение к int или None."""
     if value is None or pd.isna(value):
         return None
     try:
@@ -406,7 +402,6 @@ def _as_int(value):
 
 
 def _parse_purchase_ids(raw):
-    """Разбирает строку '1,2,3' в множество int. Возвращает set()."""
     if raw is None or pd.isna(raw) or not str(raw).strip():
         return set()
     result = set()
@@ -422,10 +417,6 @@ def _parse_purchase_ids(raw):
 
 
 def get_child_transaction_ids(parent_tx_id):
-    """
-    Возвращает список ID транзакций, у которых Parent_ID == parent_tx_id.
-    Включает покупки и продажи. Только не удалённые.
-    """
     tx = st.session_state.transactions
     if tx.empty or "Parent_ID" not in tx.columns:
         return []
@@ -439,7 +430,6 @@ def get_child_transaction_ids(parent_tx_id):
 
 
 def get_purchases_by_parent(parent_tx_id):
-    """Список ID покупок, привязанных к данному пополнению."""
     tx = st.session_state.transactions
     parent_tx_id = _as_int(parent_tx_id)
     if parent_tx_id is None or tx.empty:
@@ -454,7 +444,6 @@ def get_purchases_by_parent(parent_tx_id):
 
 
 def get_sales_by_parent(parent_tx_id):
-    """Список ID продаж, привязанных к данному пополнению."""
     tx = st.session_state.transactions
     parent_tx_id = _as_int(parent_tx_id)
     if parent_tx_id is None or tx.empty:
@@ -469,10 +458,6 @@ def get_sales_by_parent(parent_tx_id):
 
 
 def get_parent_id_for_purchase(purchase_id):
-    """
-    Возвращает Parent_ID транзакции-покупки с данным purchase_id.
-    Используется при продаже, чтобы унаследовать родителя.
-    """
     tx = st.session_state.transactions
     if tx.empty:
         return None
@@ -491,15 +476,6 @@ def get_parent_id_for_purchase(purchase_id):
 
 
 def cascade_delete_deposit(deposit_tx_id):
-    """
-    Каскадно помечает удалёнными:
-      - само пополнение,
-      - все дочерние транзакции (покупки/продажи) с Parent_ID == deposit_tx_id,
-      - связанные покупки в purchases,
-      - связанные продажи в sales (в т.ч. те, что ссылаются на удаляемые покупки через Purchase_IDs).
-
-    Возвращает dict со статистикой.
-    """
     tx = st.session_state.transactions
     deposit_tx_id = _as_int(deposit_tx_id)
     stats = {"deposit": 0, "transactions": 0, "purchases": 0, "sales": 0}
@@ -576,10 +552,6 @@ def cascade_delete_deposit(deposit_tx_id):
 
 
 def cascade_delete_purchase(purchase_id):
-    """
-    Каскадно удаляет одну покупку и связанные с ней продажи
-    (без удаления родительского пополнения).
-    """
     purchase_id = _as_int(purchase_id)
     stats = {"purchases": 0, "sales": 0, "transactions": 0}
     if purchase_id is None:
@@ -635,10 +607,6 @@ def cascade_delete_purchase(purchase_id):
 
 
 def restore_deposit_cascade(deposit_tx_id):
-    """
-    Симметричное восстановление: помечает активными пополнение и все
-    его дочерние транзакции/покупки/продажи.
-    """
     tx = st.session_state.transactions
     deposit_tx_id = _as_int(deposit_tx_id)
     stats = {"deposit": 0, "transactions": 0, "purchases": 0, "sales": 0}
@@ -680,6 +648,8 @@ def restore_deposit_cascade(deposit_tx_id):
 
     st.session_state.transactions = tx
     return stats
+
+
 # ============ РАСЧЁТЫ ПОКУПОК ============
 def recalc_status(purchases, sales, distribution):
     purchases = purchases.copy()
@@ -1279,6 +1249,8 @@ def calc_averages_for_ticker(cache_df, ticker):
     avg_3m = sum(values[-3:]) / len(values[-3:]) if len(values) >= 3 else None
 
     return avg_2y, avg_1y, avg_3m
+
+
 # ============ ИНИЦИАЛИЗАЦИЯ ============
 if "purchases" not in st.session_state:
     st.session_state.purchases = load(PURCHASES_FILE, PURCHASE_COLUMNS)
@@ -1315,6 +1287,9 @@ if "show_withdraw_form" not in st.session_state:
 
 if "show_aimoex_detail" not in st.session_state:
     st.session_state.show_aimoex_detail = False
+
+if "tx_to_delete" not in st.session_state:
+    st.session_state.tx_to_delete = None
 
 
 # ============ САЙДБАР ============
@@ -1367,7 +1342,6 @@ if page == "💼 Портфель":
     balance = get_balance()
     total = current_value + balance
 
-    # 4 карточки в ряд с короткими названиями
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Инвестировано", f"{total_invested:,.2f} ₽")
     col2.metric("Стоимость", f"{current_value:,.2f} ₽")
@@ -1376,7 +1350,6 @@ if page == "💼 Портфель":
 
     st.markdown("---")
 
-    # 3 кнопки в ряд
     col_dep, col_wd, col_refresh = st.columns(3)
     with col_dep:
         if st.button("➕ Пополнить", key="deposit_button", use_container_width=True):
@@ -1394,7 +1367,6 @@ if page == "💼 Портфель":
             get_stock_price.clear()
             st.rerun()
 
-    # Формы пополнения и вывода
     if st.session_state.get("show_deposit_form"):
         with st.form("deposit_form", clear_on_submit=True):
             st.markdown("**➕ Пополнение баланса**")
@@ -1437,7 +1409,6 @@ if page == "💼 Портфель":
 
     st.markdown("---")
     
-    # Блок с активами
     st.subheader("📊 Мои активы")
 
     if visible_purchases.empty and visible_sales.empty:
@@ -1537,7 +1508,6 @@ if page == "💼 Портфель":
 if page == "💰 Транзакции":
     st.subheader("💰 Транзакции")
 
-    # Показываем только АКТИВНЫЕ транзакции
     tx = st.session_state.transactions
     active_tx = tx[tx["Удалено"] == False] if not tx.empty else tx
 
@@ -1613,145 +1583,145 @@ if page == "💰 Транзакции":
                 if selected_tx.empty:
                     st.warning("Выберите транзакции")
                 else:
-                    # Собираем статистику того, что будет удалено
-                    to_delete_deposits = []
-                    to_delete_other = []
-                    
-                    total_purchases_to_del = 0
-                    total_sales_to_del = 0
-                    
-                    for _, row in selected_tx.iterrows():
-                        tx_id = _as_int(row["ID"])
-                        if tx_id is None:
-                            continue
+                    st.session_state.tx_to_delete = selected_tx.to_dict('records')
+                    st.rerun()
+
+            if st.session_state.get("tx_to_delete"):
+                selected_tx = pd.DataFrame(st.session_state.tx_to_delete)
+                
+                to_delete_deposits = []
+                to_delete_other = []
+                
+                total_purchases_to_del = 0
+                total_sales_to_del = 0
+                
+                for _, row in selected_tx.iterrows():
+                    tx_id = _as_int(row["ID"])
+                    if tx_id is None:
+                        continue
+                        
+                    if row["Тип"] == "Пополнение":
+                        to_delete_deposits.append(tx_id)
+                        p_ids = get_purchases_by_parent(tx_id)
+                        total_purchases_to_del += len(p_ids)
+                        
+                        s_ids = get_sales_by_parent(tx_id)
+                        total_sales_to_del += len(s_ids)
+                        
+                        if p_ids:
+                            for _, s in st.session_state.sales.iterrows():
+                                if s.get("Удалено", False): continue
+                                pids = _parse_purchase_ids(s.get("Purchase_IDs", ""))
+                                if pids & set(p_ids):
+                                    total_sales_to_del += 1
+                    else:
+                        to_delete_other.append(tx_id)
+
+                st.markdown("---")
+                st.warning(
+                    f"⚠️ **Вы уверены, что хотите удалить выбранные транзакции?**\n\n"
+                    f"- Пополнений: **{len(to_delete_deposits)}**\n"
+                    f"- Прочих транзакций: **{len(to_delete_other)}**\n"
+                    f"- Связанных покупок: **{total_purchases_to_del}**\n"
+                    f"- Связанных продаж: **{total_sales_to_del}**\n\n"
+                    f"Все эти данные будут перемещены в **Корзину** (раздел «🗑 Корзина»), откуда их можно будет восстановить."
+                )
+
+                if total_purchases_to_del > 0 or total_sales_to_del > 0:
+                    with st.expander("🔍 Посмотреть детали связанных сделок", expanded=False):
+                        detail_p = []
+                        detail_s = []
+                        for dep_id in to_delete_deposits:
+                            p_ids = get_purchases_by_parent(dep_id)
+                            s_ids = get_sales_by_parent(dep_id)
                             
-                        if row["Тип"] == "Пополнение":
-                            to_delete_deposits.append(tx_id)
-                            # Считаем связанные покупки
-                            p_ids = get_purchases_by_parent(tx_id)
-                            total_purchases_to_del += len(p_ids)
+                            for pid in p_ids:
+                                row = st.session_state.purchases[st.session_state.purchases["ID"] == pid]
+                                if not row.empty:
+                                    r = row.iloc[0]
+                                    detail_p.append({
+                                        "ID": pid,
+                                        "Дата": r.get("Дата"),
+                                        "Тикер": r.get("Тикер"),
+                                        "Наименование": r.get("Наименование"),
+                                        "Кол-во": r.get("Кол-во"),
+                                        "Инвестировано": r.get("Инвестировано"),
+                                    })
                             
-                            # Считаем связанные продажи
-                            s_ids = get_sales_by_parent(tx_id)
-                            total_sales_to_del += len(s_ids)
-                            
-                            # А также продажи, которые ссылаются на эти покупки
                             if p_ids:
                                 for _, s in st.session_state.sales.iterrows():
                                     if s.get("Удалено", False): continue
                                     pids = _parse_purchase_ids(s.get("Purchase_IDs", ""))
                                     if pids & set(p_ids):
-                                        total_sales_to_del += 1
-                        else:
-                            to_delete_other.append(tx_id)
-
-                    st.markdown("---")
-                    st.warning(
-                        f"⚠️ **Вы уверены, что хотите удалить выбранные транзакции?**\n\n"
-                        f"- Пополнений: **{len(to_delete_deposits)}**\n"
-                        f"- Прочих транзакций: **{len(to_delete_other)}**\n"
-                        f"- Связанных покупок: **{total_purchases_to_del}**\n"
-                        f"- Связанных продаж: **{total_sales_to_del}**\n\n"
-                        f"Все эти данные будут перемещены в **Корзину** (раздел «🗑 Корзина»), откуда их можно будет восстановить."
-                    )
-
-                    # --- ДЕТАЛИЗАЦИЯ СВЯЗАННЫХ СДЕЛОК ---
-                    if total_purchases_to_del > 0 or total_sales_to_del > 0:
-                        with st.expander("🔍 Посмотреть детали связанных сделок", expanded=False):
-                            
-                            # Собираем все покупки и продажи, привязанные к выбранным пополнениям
-                            detail_p = []
-                            detail_s = []
-                            for dep_id in to_delete_deposits:
-                                p_ids = get_purchases_by_parent(dep_id)
-                                s_ids = get_sales_by_parent(dep_id)
-                                
-                                for pid in p_ids:
-                                    row = st.session_state.purchases[st.session_state.purchases["ID"] == pid]
-                                    if not row.empty:
-                                        r = row.iloc[0]
-                                        detail_p.append({
-                                            "ID": pid,
-                                            "Дата": r.get("Дата"),
-                                            "Тикер": r.get("Тикер"),
-                                            "Наименование": r.get("Наименование"),
-                                            "Кол-во": r.get("Кол-во"),
-                                            "Инвестировано": r.get("Инвестировано"),
+                                        detail_s.append({
+                                            "Sale_ID": s.get("Sale_ID"),
+                                            "Дата продажи": s.get("Дата продажи"),
+                                            "Тикер": s.get("Тикер"),
+                                            "Наименование": s.get("Наименование"),
+                                            "Кол-во": abs(s.get("Кол-во")),
+                                            "Сумма продажи": abs(s.get("Сумма продажи")),
                                         })
+                        
+                        tab1, tab2 = st.tabs([f"📦 Покупки ({len(detail_p)})", f"💸 Продажи ({len(detail_s)})"])
+                        
+                        with tab1:
+                            if detail_p:
+                                df_p = pd.DataFrame(detail_p)
+                                df_p["Дата"] = pd.to_datetime(df_p["Дата"], errors="coerce").dt.strftime("%d.%m.%Y")
+                                df_p = df_p.rename(columns={"Инвестировано": "Инвестировано, ₽"})
+                                st.dataframe(df_p, width="stretch", hide_index=True)
+                            else:
+                                st.write("Нет связанных покупок.")
                                 
-                                # Ищем продажи, которые ссылаются на эти покупки
-                                if p_ids:
-                                    for _, s in st.session_state.sales.iterrows():
-                                        if s.get("Удалено", False): continue
-                                        pids = _parse_purchase_ids(s.get("Purchase_IDs", ""))
-                                        if pids & set(p_ids):
-                                            detail_s.append({
-                                                "Sale_ID": s.get("Sale_ID"),
-                                                "Дата продажи": s.get("Дата продажи"),
-                                                "Тикер": s.get("Тикер"),
-                                                "Наименование": s.get("Наименование"),
-                                                "Кол-во": abs(s.get("Кол-во")),
-                                                "Сумма продажи": abs(s.get("Сумма продажи")),
-                                            })
+                        with tab2:
+                            if detail_s:
+                                df_s = pd.DataFrame(detail_s)
+                                df_s["Дата продажи"] = pd.to_datetime(df_s["Дата продажи"], errors="coerce").dt.strftime("%d.%m.%Y")
+                                df_s = df_s.rename(columns={"Сумма продажи": "Сумма продажи, ₽"})
+                                st.dataframe(df_s, width="stretch", hide_index=True)
+                            else:
+                                st.write("Нет связанных продаж.")
+
+                col_yes, col_no = st.columns(2)
+                
+                with col_yes:
+                    if st.button("✅ Да, удалить", key="confirm_tx_delete", type="primary", use_container_width=True):
+                        total_deposits = 0
+                        total_transactions = 0
+                        total_purchases = 0
+                        total_sales = 0
+
+                        for tx_id in to_delete_deposits:
+                            stats = cascade_delete_deposit(tx_id)
+                            total_deposits += stats["deposit"]
+                            total_transactions += stats["transactions"]
+                            total_purchases += stats["purchases"]
+                            total_sales += stats["sales"]
                             
-                            tab1, tab2 = st.tabs([f"📦 Покупки ({len(detail_p)})", f"💸 Продажи ({len(detail_s)})"])
-                            
-                            with tab1:
-                                if detail_p:
-                                    df_p = pd.DataFrame(detail_p)
-                                    df_p["Дата"] = pd.to_datetime(df_p["Дата"], errors="coerce").dt.strftime("%d.%m.%Y")
-                                    df_p = df_p.rename(columns={"Инвестировано": "Инвестировано, ₽"})
-                                    st.dataframe(df_p, width="stretch", hide_index=True)
-                                else:
-                                    st.write("Нет связанных покупок.")
-                                    
-                            with tab2:
-                                if detail_s:
-                                    df_s = pd.DataFrame(detail_s)
-                                    df_s["Дата продажи"] = pd.to_datetime(df_s["Дата продажи"], errors="coerce").dt.strftime("%d.%m.%Y")
-                                    df_s = df_s.rename(columns={"Сумма продажи": "Сумма продажи, ₽"})
-                                    st.dataframe(df_s, width="stretch", hide_index=True)
-                                else:
-                                    st.write("Нет связанных продаж.")
+                        for tx_id in to_delete_other:
+                            tx_mask = st.session_state.transactions["ID"].apply(_as_int) == tx_id
+                            if tx_mask.any():
+                                st.session_state.transactions.loc[tx_mask, "Удалено"] = True
+                                total_transactions += int(tx_mask.sum())
 
-                    col_yes, col_no = st.columns(2)
-                    
-                    with col_yes:
-                        if st.button("✅ Да, удалить", key="confirm_tx_delete", type="primary", use_container_width=True):
-                            total_deposits = 0
-                            total_transactions = 0
-                            total_purchases = 0
-                            total_sales = 0
+                        save_transactions(st.session_state.transactions)
+                        save(st.session_state.purchases, PURCHASES_FILE)
+                        save(st.session_state.sales, SALES_FILE)
 
-                            for tx_id in to_delete_deposits:
-                                stats = cascade_delete_deposit(tx_id)
-                                total_deposits += stats["deposit"]
-                                total_transactions += stats["transactions"]
-                                total_purchases += stats["purchases"]
-                                total_sales += stats["sales"]
-                                
-                            for tx_id in to_delete_other:
-                                tx_mask = st.session_state.transactions["ID"].apply(_as_int) == tx_id
-                                if tx_mask.any():
-                                    st.session_state.transactions.loc[tx_mask, "Удалено"] = True
-                                    total_transactions += int(tx_mask.sum())
-
-                            save_transactions(st.session_state.transactions)
-                            save(st.session_state.purchases, PURCHASES_FILE)
-                            save(st.session_state.sales, SALES_FILE)
-
-                            st.success(
-                                f"Удалено в корзину: пополнений — {total_deposits}, "
-                                f"транзакций — {total_transactions}, "
-                                f"покупок — {total_purchases}, "
-                                f"продаж — {total_sales}. "
-                                f"Восстановить можно в разделе «🗑 Корзина»."
-                            )
-                            st.rerun()
-                            
-                    with col_no:
-                        if st.button("❌ Отмена", key="cancel_tx_delete", use_container_width=True):
-                            st.rerun()
+                        st.success(
+                            f"Удалено в корзину: пополнений — {total_deposits}, "
+                            f"транзакций — {total_transactions}, "
+                            f"покупок — {total_purchases}, "
+                            f"продаж — {total_sales}. "
+                            f"Восстановить можно в разделе «🗑 Корзина»."
+                        )
+                        st.session_state.tx_to_delete = None
+                        st.rerun()
+                        
+                with col_no:
+                    if st.button("❌ Отмена", key="cancel_tx_delete", use_container_width=True):
+                        st.session_state.tx_to_delete = None
+                        st.rerun()
 
 
 # ============ РАЗДЕЛ: ПОКУПКИ ============
@@ -2278,7 +2248,9 @@ if page == "📦 Архив":
                     "ID": st.column_config.NumberColumn("ID", format="%d", width="small"),
                 },
             )
-            # ============ РАЗДЕЛ: КОРЗИНА ============
+
+
+# ============ РАЗДЕЛ: КОРЗИНА ============
 if page == "🗑 Корзина":
     st.subheader("🗑 Корзина")
     st.caption("Удалённые записи. Можно восстановить или очистить навсегда.")
