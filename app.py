@@ -14,7 +14,6 @@ st.markdown("""
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
-    
     @media (max-width: 768px) {
         html, body { overflow-x: hidden !important; }
         [data-testid="stAppViewContainer"] { overflow-x: hidden !important; }
@@ -23,17 +22,6 @@ st.markdown("""
         [data-testid="stMetricLabel"] { font-size: 0.7rem !important; white-space: normal !important; }
         .block-container { padding-top: 1rem !important; gap: 0.5rem !important; }
         [data-testid="column"] { padding: 0px !important; min-width: 0 !important; }
-        
-        .asset-card {
-            background-color: var(--secondary-background-color);
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            border: 1px solid var(--border-color);
-        }
-        .asset-title { font-weight: bold; font-size: 1rem; margin-bottom: 5px; }
-        .asset-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 2px; }
-        .asset-profit { font-weight: bold; font-size: 1rem; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -54,7 +42,6 @@ INDICATOR_COLUMNS = ["Наименование", "Тикер", "Вирт. Инв
 ASSETS_COLUMNS = ["Тикер", "Наименование", "Добавлено"]
 HISTORY_COLUMNS = ["Тикер", "Месяц", "% Акции", "% IMOEX", "Разница", "Обновлено"]
 
-# ============ MOEX ============
 @st.cache_data(ttl=300)
 def get_imoex():
     url = "https://iss.moex.com/iss/engines/stock/markets/index/securities/IMOEX.json"
@@ -115,7 +102,6 @@ def find_tickers(query):
         return results
     except Exception: return []
 
-# ============ ЗАГРУЗКА / СОХРАНЕНИЕ ============
 def load(file, columns):
     if file.exists():
         try:
@@ -170,7 +156,6 @@ def get_next_transaction_id(df):
     try: return int(ids.astype(int).max()) + 1
     except Exception: return 1
 
-# ============ ТРАНЗАКЦИИ ============
 def add_transaction(t_type, amount, comment="", linked_id=None, parent_id=None):
     df = st.session_state.transactions.copy()
     new_id = get_next_transaction_id(df)
@@ -207,7 +192,6 @@ def restore_transaction(linked_id):
         st.session_state.transactions.loc[mask, "Удалено"] = False
         save_transactions(st.session_state.transactions)
 
-# ============ КАСКАД ТРАНЗАКЦИЙ ============
 def _as_int(value):
     if value is None or pd.isna(value): return None
     try: return int(value)
@@ -381,7 +365,6 @@ def find_and_clean_orphan_purchases():
         save(st.session_state.purchases, PURCHASES_FILE); save(st.session_state.sales, SALES_FILE); save_transactions(st.session_state.transactions)
     return deleted_count
 
-# ============ РАСЧЁТЫ ============
 def recalc_status(purchases, sales, distribution):
     purchases = purchases.copy()
     active_sale_ids = set(sales[sales["Удалено"] == False]["Sale_ID"].dropna().astype(int).tolist())
@@ -467,7 +450,6 @@ def calc_current_value(visible_purchases, visible_sales):
         except Exception: pass
     return total
 
-# ============ ИНДИКАТОР ============
 def calc_indicator_pct(row, current_imoex):
     virt = 1
     cur_price = row.get("Тек.цена актива")
@@ -596,7 +578,6 @@ def check_and_update_indicator(current_imoex):
         save_indicator(df)
     return df
 
-# ============ АКТИВЫ К IMOEX ============
 def is_cache_fresh():
     cache = load_history_cache()
     if cache.empty: return False
@@ -708,7 +689,7 @@ def calc_averages_for_ticker(cache_df, ticker):
     avg_1y = sum(values[-12:]) / len(values[-12:]) if len(values) >= 12 else None
     avg_3m = sum(values[-3:]) / len(values[-3:]) if len(values) >= 3 else None
     return avg_2y, avg_1y, avg_3m
-# ============ ИНИЦИАЛИЗАЦИЯ ============
+
 if "purchases" not in st.session_state: st.session_state.purchases = load(PURCHASES_FILE, PURCHASE_COLUMNS)
 if "sales" not in st.session_state: st.session_state.sales = load(SALES_FILE, SALE_COLUMNS)
 if "distribution" not in st.session_state: st.session_state.distribution = load_distribution()
@@ -723,10 +704,8 @@ if "show_withdraw_form" not in st.session_state: st.session_state.show_withdraw_
 if "show_aimoex_detail" not in st.session_state: st.session_state.show_aimoex_detail = False
 if "tx_to_delete" not in st.session_state: st.session_state.tx_to_delete = None
 
-# ============ САЙДБАР ============
 page = st.sidebar.radio("Меню", ["💼 Портфель", "📈 Индикатор", "📊 Активы к IMOEX", "🟢 Покупки", "📊 История продаж", "💰 Транзакции", "📦 Архив", "🗑 Корзина"], key="page")
 
-# ============ РАЗДЕЛ: ПОРТФЕЛЬ ============
 if page == "💼 Портфель":
     st.subheader("💼 Портфель")
     visible_purchases = st.session_state.purchases[st.session_state.purchases["Удалено"] == False].copy()
@@ -843,7 +822,6 @@ if page == "💼 Портфель":
         adf_show["Прибыль"] = adf_show["Прибыль"].apply(lambda x: f"{'+' if float(x) >= 0 else ''}{float(x):,.2f} ₽")
         st.dataframe(adf_show, width="stretch", hide_index=True)
 
-# ============ РАЗДЕЛ: ТРАНЗАКЦИИ ============
 if page == "💰 Транзакции":
     st.subheader("💰 Транзакции")
     tx = st.session_state.transactions
@@ -926,350 +904,6 @@ if page == "💰 Транзакции":
                         st.session_state.tx_to_delete = None
                         st.rerun()
 
-# ============ РАЗДЕЛ: ПОКУПКИ ============
-if page == "🟢 Покупки":
-    col_im, col_balance, col_btn = st.columns([2, 1, 1])
-    with col_im:
-        current_imoex = get_imoex()
-        if current_imoex is not None:
-            st.markdown(f"### 📈 IMOEX: **{current_imoex:.3f}**")
-            st.caption("Обновляется автоматически раз в 5 минут")
-        else:
-            st.warning("⚠️ Не удалось получить IMOEX с MOEX")
-            current_imoex = None
-    with col_balance: st.metric("💰 Баланс", f"{get_balance():,.2f} ₽")
-    with col_btn:
-        if st.button("🔄 Обновить", key="refresh_purchases", use_container_width=True):
-            get_imoex.clear(); get_stock_price.clear(); st.rerun()
-
-    st.markdown("---")
-    with st.expander("➕ Добавить покупку", expanded=False):
-        with st.form("buy_form", clear_on_submit=True):
-            deal_date = st.date_input("Дата покупки", value=date.today())
-            query = st.text_input("Введите название (например: Лукойл, Сбер)")
-            selected_ticker, selected_name, allow_no_ticker = None, None, False
-            if query and len(query) >= 2:
-                found = find_tickers(query)
-                if found:
-                    options = ["— выберите тикер —"] + [f["label"] for f in found]
-                    chosen = st.selectbox("Найдено на MOEX:", options)
-                    if chosen != "— выберите тикер —":
-                        selected = next(f for f in found if f["label"] == chosen)
-                        selected_ticker, selected_name = selected["ticker"], selected["name"]
-                        st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
-                else:
-                    st.warning("⚠️ Бумага не найдена на MOEX.")
-                    allow_no_ticker = st.checkbox("Добавить без тикера")
-
-            c1, c2 = st.columns(2)
-            with c1:
-                price = st.number_input("Цена актива", value=0.0, step=0.001, format="%.3f")
-                quantity = st.number_input("Кол-во", value=1, step=1)
-            with c2:
-                imoex_buy = st.number_input("Покупка IMOEX", value=0.0, step=0.01, format="%.3f")
-                commission = st.number_input("Комиссия, ₽", value=0.0, step=1.0, format="%.3f")
-
-            submitted = st.form_submit_button("Добавить покупку")
-            if submitted:
-                if not query: st.warning("Введите название")
-                elif selected_ticker is None and not allow_no_ticker: st.warning("Выберите тикер")
-                elif price <= 0: st.warning("Введите цену > 0")
-                elif imoex_buy <= 0: st.warning("Введите IMOEX > 0")
-                else:
-                    invested = price * quantity + commission
-                    if get_balance() < invested:
-                        st.error(f"❌ Недостаточно средств. Нужно: {invested:,.2f} ₽, на балансе: {get_balance():,.2f} ₽")
-                    else:
-                        virt_imoex = invested / imoex_buy
-                        new_id = get_next_purchase_id(st.session_state.purchases)
-                        new_row = {"ID": new_id, "Дата": deal_date, "Тикер": selected_ticker, "Наименование": selected_name if selected_name else query, "Цена актива": price, "Кол-во": quantity, "Комиссия": commission, "Инвестировано": round(invested, 3), "Покупка IMOEX": imoex_buy, "Вирт. Кол-во IMOEX": round(virt_imoex, 6), "Тек.цена актива": None, "Тек. цена IMOEX": None, "% к индексу": None, "Статус": "ОТКРЫТА", "Удалено": False}
-                        st.session_state.purchases = pd.concat([st.session_state.purchases, pd.DataFrame([new_row])], ignore_index=True)
-                        save(st.session_state.purchases, PURCHASES_FILE)
-                        active_dep = st.session_state.transactions[(st.session_state.transactions["Тип"] == "Пополнение") & (st.session_state.transactions["Удалено"] == False)]
-                        parent_tx_id = _as_int(active_dep.iloc[-1]["ID"]) if not active_dep.empty else None
-                        create_purchase_transaction(new_id, invested, selected_name if selected_name else query, parent_id=parent_tx_id)
-                        st.success(f"Добавлено: {selected_name or query}, {quantity} шт. (ID: {new_id})")
-                        st.rerun()
-
-    st.subheader("Активные покупки")
-    visible_purchases = st.session_state.purchases[st.session_state.purchases["Удалено"] == False].copy()
-    visible_sales = st.session_state.sales[st.session_state.sales["Удалено"] == False].copy()
-
-    if visible_purchases.empty: st.info("Пока пусто. Добавьте первую покупку.")
-    else:
-        all_display = refresh_open_purchases(recalc_status(visible_purchases, visible_sales, st.session_state.distribution), current_imoex)
-        for idx_vis in all_display.index:
-            if idx_vis in st.session_state.purchases.index:
-                st.session_state.purchases.at[idx_vis, "Тек.цена актива"] = all_display.at[idx_vis, "Тек.цена актива"]
-                st.session_state.purchases.at[idx_vis, "Тек. цена IMOEX"] = all_display.at[idx_vis, "Тек. цена IMOEX"]
-                st.session_state.purchases.at[idx_vis, "% к индексу"] = all_display.at[idx_vis, "% к индексу"]
-        save(st.session_state.purchases, PURCHASES_FILE)
-
-        active = all_display[all_display["Статус"] != "ЗАКРЫТА"].copy()
-        if active.empty: st.info("Нет активных покупок. Все закрыты — смотри раздел «Архив».")
-        else:
-            active_show = active.copy()
-            active_show["Дата"] = pd.to_datetime(active_show["Дата"], errors="coerce").dt.strftime("%d.%m.%Y")
-            for drop_col in ["Комиссия", "Вирт. Кол-во IMOEX", "Удалено"]:
-                if drop_col in active_show.columns: active_show = active_show.drop(columns=[drop_col])
-            active_show = active_show[["Дата", "Тикер", "Наименование", "Кол-во", "Остаток", "Цена актива", "Покупка IMOEX", "Инвестировано", "Тек.цена актива", "Тек. цена IMOEX", "% к индексу", "Статус", "ID"]].copy()
-            for c in ["Кол-во", "Остаток", "Цена актива", "Покупка IMOEX", "Инвестировано", "Тек.цена актива", "Тек. цена IMOEX"]:
-                if c in active_show.columns: active_show[c] = active_show[c].apply(format_number)
-            if "% к индексу" in active_show.columns: active_show["% к индексу"] = active_show["% к индексу"].apply(lambda x: f"{float(x) * 100:.3f}%" if pd.notna(x) and x is not None else "")
-            active_show.insert(0, "✓", False)
-
-            edited = st.data_editor(active_show, width="stretch", hide_index=True, column_config={"✓": st.column_config.CheckboxColumn("✓", default=False, width="small"), "ID": st.column_config.NumberColumn("ID", format="%d", width="small")}, disabled=[c for c in active_show.columns if c != "✓"], key="active_editor")
-            selected_rows = edited[edited["✓"] == True]
-
-            col_sell, col_del = st.columns(2)
-            with col_sell:
-                if st.button("💸 Продать выбранное", key="sell_button", use_container_width=True):
-                    if selected_rows.empty: st.warning("Выберите строки (поставьте галочки)")
-                    else:
-                        tickers = selected_rows["Тикер"].dropna().unique().tolist()
-                        if len(tickers) > 1: st.error(f"❌ Выбраны разные тикеры: {tickers}. Продавать можно только один тикер за раз.")
-                        else:
-                            total_remaining = sum(int(float(r["Остаток"])) for _, r in selected_rows.iterrows() if pd.notna(r["Остаток"]))
-                            st.session_state.sell_targets = {"rows": selected_rows.to_dict("records"), "ticker": tickers[0] if tickers else "", "total_remaining": total_remaining}
-
-            with col_del:
-                if st.button("🗑 Пометить как удалённое", key="delete_purchase_button", use_container_width=True):
-                    if selected_rows.empty: st.warning("Выберите строки (поставьте галочки)")
-                    else:
-                        to_mark = [all_display[all_display["ID"] == row["ID"]].index[0] for idx, row in selected_rows.iterrows() if pd.notna(row.get("ID")) and not all_display[all_display["ID"] == row["ID"]].empty]
-                        if to_mark:
-                            st.session_state.confirm_delete_purchases = to_mark
-                            st.rerun()
-
-            if st.session_state.get("confirm_delete_purchases"):
-                to_mark = st.session_state.confirm_delete_purchases
-                st.warning(f"⚠️ Будет помечено как удалённое:\n- Покупок: **{len(to_mark)}**\n\nДанные останутся в корзине, их можно будет восстановить.")
-                col_yes, col_no = st.columns(2)
-                with col_yes:
-                    if st.button("✅ Да, пометить", key="confirm_yes", use_container_width=True):
-                        for p_idx in to_mark:
-                            if p_idx in st.session_state.purchases.index:
-                                pid = st.session_state.purchases.loc[p_idx, "ID"]
-                                if
-                                # ============ ИНИЦИАЛИЗАЦИЯ ============
-if "purchases" not in st.session_state: st.session_state.purchases = load(PURCHASES_FILE, PURCHASE_COLUMNS)
-if "sales" not in st.session_state: st.session_state.sales = load(SALES_FILE, SALE_COLUMNS)
-if "distribution" not in st.session_state: st.session_state.distribution = load_distribution()
-if "transactions" not in st.session_state: st.session_state.transactions = load_transactions()
-if "indicator" not in st.session_state: st.session_state.indicator = load_indicator()
-if "assets_to_imoex" not in st.session_state: st.session_state.assets_to_imoex = load_assets()
-if "history_cache" not in st.session_state: st.session_state.history_cache = load_history_cache()
-if "sell_targets" not in st.session_state: st.session_state.sell_targets = None
-if "confirm_delete_purchases" not in st.session_state: st.session_state.confirm_delete_purchases = None
-if "show_deposit_form" not in st.session_state: st.session_state.show_deposit_form = False
-if "show_withdraw_form" not in st.session_state: st.session_state.show_withdraw_form = False
-if "show_aimoex_detail" not in st.session_state: st.session_state.show_aimoex_detail = False
-if "tx_to_delete" not in st.session_state: st.session_state.tx_to_delete = None
-
-# ============ САЙДБАР ============
-page = st.sidebar.radio("Меню", ["💼 Портфель", "📈 Индикатор", "📊 Активы к IMOEX", "🟢 Покупки", "📊 История продаж", "💰 Транзакции", "📦 Архив", "🗑 Корзина"], key="page")
-
-# ============ РАЗДЕЛ: ПОРТФЕЛЬ ============
-if page == "💼 Портфель":
-    st.subheader("💼 Портфель")
-    visible_purchases = st.session_state.purchases[st.session_state.purchases["Удалено"] == False].copy()
-    visible_sales = st.session_state.sales[st.session_state.sales["Удалено"] == False].copy()
-
-    if not visible_purchases.empty:
-        current_imoex_val = get_imoex()
-        updated = refresh_open_purchases(recalc_status(visible_purchases, visible_sales, st.session_state.distribution), current_imoex_val)
-        for idx_vis in updated.index:
-            if idx_vis in st.session_state.purchases.index:
-                st.session_state.purchases.at[idx_vis, "Тек.цена актива"] = updated.at[idx_vis, "Тек.цена актива"]
-                st.session_state.purchases.at[idx_vis, "Тек. цена IMOEX"] = updated.at[idx_vis, "Тек. цена IMOEX"]
-                st.session_state.purchases.at[idx_vis, "% к индексу"] = updated.at[idx_vis, "% к индексу"]
-        save(st.session_state.purchases, PURCHASES_FILE)
-        visible_purchases = st.session_state.purchases[st.session_state.purchases["Удалено"] == False].copy()
-
-    total_invested = calc_total_invested()
-    current_value = calc_current_value(visible_purchases, visible_sales)
-    balance = get_balance()
-    total = current_value + balance
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Инвестировано", f"{total_invested:,.2f} ₽")
-    col2.metric("Стоимость", f"{current_value:,.2f} ₽")
-    col3.metric("Баланс", f"{balance:,.2f} ₽")
-    col4.metric("Итого", f"{total:,.2f} ₽")
-
-    st.markdown("---")
-    col_dep, col_wd, col_refresh = st.columns(3)
-    with col_dep:
-        if st.button("➕ Пополнить", key="deposit_button", use_container_width=True):
-            st.session_state.show_deposit_form = True
-            st.session_state.show_withdraw_form = False
-            st.rerun()
-    with col_wd:
-        if st.button("➖ Вывести", key="withdraw_button", use_container_width=True):
-            st.session_state.show_withdraw_form = True
-            st.session_state.show_deposit_form = False
-            st.rerun()
-    with col_refresh:
-        if st.button("🔄 Цены", key="refresh_portfolio", use_container_width=True):
-            get_imoex.clear(); get_stock_price.clear(); st.rerun()
-
-    if st.session_state.get("show_deposit_form"):
-        with st.form("deposit_form", clear_on_submit=True):
-            st.markdown("**➕ Пополнение баланса**")
-            amount = st.number_input("Сумма, ₽", value=0.0, step=100.0, format="%.2f")
-            comment = st.text_input("Комментарий")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.form_submit_button("Пополнить", use_container_width=True):
-                    if amount <= 0: st.warning("Введите сумму > 0")
-                    else:
-                        add_transaction("Пополнение", abs(amount), comment)
-                        st.session_state.show_deposit_form = False
-                        st.success(f"Пополнено: {amount:.2f} ₽")
-                        st.rerun()
-            with c2:
-                if st.form_submit_button("Отмена", use_container_width=True):
-                    st.session_state.show_deposit_form = False
-                    st.rerun()
-
-    if st.session_state.get("show_withdraw_form"):
-        with st.form("withdraw_form", clear_on_submit=True):
-            st.markdown("**➖ Вывод средств**")
-            amount = st.number_input("Сумма, ₽", value=0.0, step=100.0, format="%.2f")
-            comment = st.text_input("Комментарий")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.form_submit_button("Вывести", use_container_width=True):
-                    if amount <= 0: st.warning("Введите сумму > 0")
-                    else:
-                        add_transaction("Вывод", -abs(amount), comment)
-                        st.session_state.show_withdraw_form = False
-                        st.success(f"Выведено: {amount:.2f} ₽")
-                        st.rerun()
-            with c2:
-                if st.form_submit_button("Отмена", use_container_width=True):
-                    st.session_state.show_withdraw_form = False
-                    st.rerun()
-
-    st.markdown("---")
-    st.subheader("📊 Мои активы")
-    if visible_purchases.empty and visible_sales.empty:
-        st.info("Пока нет активов.")
-    else:
-        all_names = set(visible_purchases["Наименование"].dropna().unique().tolist()) | set(visible_sales["Наименование"].dropna().unique().tolist())
-        assets_rows = []
-        for name in sorted(all_names):
-            p_rows = visible_purchases[visible_purchases["Наименование"] == name]
-            s_rows = visible_sales[visible_sales["Наименование"] == name]
-            bought, sold, inv_purchases, inv_sales = 0, 0, 0.0, 0.0
-            for _, r in p_rows.iterrows():
-                try: bought += int(float(r["Кол-во"])); inv_purchases += float(r["Инвестировано"])
-                except Exception: pass
-            for _, r in s_rows.iterrows():
-                try: sold += int(float(r["Кол-во"])); inv_sales += float(r["Сумма продажи"])
-                except Exception: pass
-            remaining = bought + sold
-            invested_net = inv_purchases + inv_sales
-            current_val = 0.0
-            if remaining > 0 and not p_rows.empty:
-                try:
-                    price = p_rows.iloc[-1].get("Тек.цена актива")
-                    if pd.notna(price): current_val = remaining * float(price)
-                except Exception: pass
-            profit = current_val - invested_net
-            assets_rows.append({"Наименование": name, "Куплено": bought, "Продано": sold, "Остаток": remaining, "Инвестировано": invested_net, "Тек.стоимость": current_val, "Прибыль": profit})
-
-        adf = pd.DataFrame(assets_rows)
-        adf_show = adf.copy()
-        adf_show["Инвестировано"] = adf_show["Инвестировано"].apply(lambda x: f"{float(x):,.2f} ₽")
-        adf_show["Тек.стоимость"] = adf_show["Тек.стоимость"].apply(lambda x: f"{float(x):,.2f} ₽")
-        adf_show["Прибыль"] = adf_show["Прибыль"].apply(lambda x: f"{'+' if float(x) >= 0 else ''}{float(x):,.2f} ₽")
-        st.dataframe(adf_show, width="stretch", hide_index=True)
-
-# ============ РАЗДЕЛ: ТРАНЗАКЦИИ ============
-if page == "💰 Транзакции":
-    st.subheader("💰 Транзакции")
-    tx = st.session_state.transactions
-    active_tx = tx[tx["Удалено"] == False] if not tx.empty else tx
-    deposits = active_tx[active_tx["Тип"] == "Пополнение"]["Сумма"].sum() if not active_tx.empty else 0
-    withdrawals = active_tx[active_tx["Тип"] == "Вывод"]["Сумма"].sum() if not active_tx.empty else 0
-    balance = get_balance()
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Всего пополнено", f"{float(deposits):+,.2f} ₽")
-    col2.metric("Всего выведено", f"{float(withdrawals):+,.2f} ₽")
-    col3.metric("Баланс", f"{float(balance):,.2f} ₽")
-
-    st.markdown("---")
-    st.subheader("Все транзакции")
-    filter_type = st.selectbox("Фильтр по типу:", ["Пополнение и вывод", "Все", "Пополнение", "Вывод", "Покупка", "Продажа"], key="tx_filter")
-
-    if active_tx.empty:
-        st.info("Активных транзакций пока нет.")
-    else:
-        tx_show = active_tx.copy()
-        if filter_type == "Пополнение и вывод": tx_show = tx_show[tx_show["Тип"].isin(["Пополнение", "Вывод"])]
-        elif filter_type != "Все": tx_show = tx_show[tx_show["Тип"] == filter_type]
-
-        if tx_show.empty:
-            st.info(f"Транзакций типа «{filter_type}» нет.")
-        else:
-            tx_show["Дата"] = pd.to_datetime(tx_show["Дата"], errors="coerce").dt.strftime("%d.%m.%Y")
-            tx_show["Сумма_fmt"] = tx_show["Сумма"].apply(lambda x: format(float(x), '+,.2f') if pd.notna(x) else "")
-            tx_show = tx_show.sort_values("ID", ascending=False).reset_index(drop=True)
-            tx_display = tx_show[["ID", "Дата", "Время", "Тип", "Сумма_fmt", "Комментарий"]].rename(columns={"Сумма_fmt": "Сумма"})
-            tx_display.insert(0, "✓", False)
-
-            edited_tx = st.data_editor(tx_display, width="stretch", hide_index=True, column_config={"✓": st.column_config.CheckboxColumn("✓", default=False, width="small"), "ID": st.column_config.NumberColumn("ID", format="%d", width="small")}, disabled=[c for c in tx_display.columns if c != "✓"], key="tx_editor")
-            selected_tx = edited_tx[edited_tx["✓"] == True]
-
-            if st.button("🗑 Удалить выбранные", key="tx_delete_button"):
-                if selected_tx.empty: st.warning("Выберите транзакции")
-                else:
-                    st.session_state.tx_to_delete = selected_tx.to_dict('records')
-                    st.rerun()
-
-            if st.session_state.get("tx_to_delete"):
-                selected_tx = pd.DataFrame(st.session_state.tx_to_delete)
-                to_delete_deposits, to_delete_other = [], []
-                total_purchases_to_del, total_sales_to_del = 0, 0
-                for _, row in selected_tx.iterrows():
-                    tx_id = _as_int(row["ID"])
-                    if tx_id is None: continue
-                    if row["Тип"] == "Пополнение":
-                        to_delete_deposits.append(tx_id)
-                        total_purchases_to_del += len(get_purchases_by_parent(tx_id))
-                        total_sales_to_del += len(get_sales_by_parent(tx_id))
-                    else: to_delete_other.append(tx_id)
-
-                st.markdown("---")
-                st.warning(f"⚠️ **Вы уверены, что хотите удалить выбранные транзакции?**\n\n- Пополнений: **{len(to_delete_deposits)}**\n- Прочих транзакций: **{len(to_delete_other)}**\n- Связанных покупок: **{total_purchases_to_del}**\n- Связанных продаж: **{total_sales_to_del}**\n\nВсе эти данные будут перемещены в **Корзину** (раздел «🗑 Корзина»), откуда их можно будет восстановить.")
-
-                col_yes, col_no = st.columns(2)
-                with col_yes:
-                    if st.button("✅ Да, удалить", key="confirm_tx_delete", type="primary", use_container_width=True):
-                        total_deposits, total_transactions, total_purchases, total_sales = 0, 0, 0, 0
-                        for tx_id in to_delete_deposits:
-                            stats = cascade_delete_deposit(tx_id)
-                            total_deposits += stats["deposit"]; total_transactions += stats["transactions"]; total_purchases += stats["purchases"]; total_sales += stats["sales"]
-                        for tx_id in to_delete_other:
-                            tx_mask = st.session_state.transactions["ID"].apply(_as_int) == tx_id
-                            if tx_mask.any():
-                                st.session_state.transactions.loc[tx_mask, "Удалено"] = True
-                                total_transactions += int(tx_mask.sum())
-
-                        save_transactions(st.session_state.transactions)
-                        save(st.session_state.purchases, PURCHASES_FILE)
-                        save(st.session_state.sales, SALES_FILE)
-                        st.success(f"Удалено в корзину: пополнений — {total_deposits}, транзакций — {total_transactions}, покупок — {total_purchases}, продаж — {total_sales}. Восстановить можно в разделе «🗑 Корзина».")
-                        st.session_state.tx_to_delete = None
-                        st.rerun()
-                with col_no:
-                    if st.button("❌ Отмена", key="cancel_tx_delete", use_container_width=True):
-                        st.session_state.tx_to_delete = None
-                        st.rerun()
-
-# ============ РАЗДЕЛ: ПОКУПКИ ============
 if page == "🟢 Покупки":
     col_im, col_balance, col_btn = st.columns([2, 1, 1])
     with col_im:
@@ -1458,7 +1092,6 @@ if page == "🟢 Покупки":
                 if st.button("❌ Отмена", key="cancel_sell"):
                     st.session_state.sell_targets = None; st.rerun()
 
-# ============ РАЗДЕЛ: АРХИВ ============
 if page == "📦 Архив":
     st.subheader("📦 Архив закрытых покупок")
     st.caption("Только просмотр. Чтобы вернуть — удалите продажу в разделе «История продаж».")
@@ -1481,7 +1114,6 @@ if page == "📦 Архив":
             if "% к индексу" in archive_show.columns: archive_show["% к индексу"] = archive_show["% к индексу"].apply(lambda x: f"{float(x) * 100:.3f}%" if pd.notna(x) and x is not None else "")
             st.dataframe(archive_show, width="stretch", hide_index=True, column_config={"ID": st.column_config.NumberColumn("ID", format="%d", width="small")})
 
-# ============ РАЗДЕЛ: КОРЗИНА ============
 if page == "🗑 Корзина":
     st.subheader("🗑 Корзина")
     st.caption("Удалённые транзакции. Можно восстановить или очистить навсегда.")
@@ -1535,7 +1167,6 @@ if page == "🗑 Корзина":
             save_transactions(st.session_state.transactions); save(st.session_state.purchases, PURCHASES_FILE); save(st.session_state.sales, SALES_FILE)
             st.success("Корзина очищена. Данные удалены навсегда."); st.rerun()
 
-# ============ РАЗДЕЛ: ИСТОРИЯ ПРОДАЖ ============
 if page == "📊 История продаж":
     st.subheader("📊 История продаж")
     visible_sales = st.session_state.sales[st.session_state.sales["Удалено"] == False].copy()
@@ -1574,7 +1205,6 @@ if page == "📊 История продаж":
                     st.success(f"Помечено продаж: {len(to_mark)}. Можно восстановить в Корзине.")
                     st.rerun()
 
-# ============ РАЗДЕЛ: ИНДИКАТОР ============
 if page == "📈 Индикатор":
     col_im, col_btn = st.columns([3, 1])
     with col_im:
@@ -1650,7 +1280,6 @@ if page == "📈 Индикатор":
                     st.session_state.indicator = st.session_state.indicator.drop(to_delete).reset_index(drop=True)
                     save_indicator(st.session_state.indicator); st.success(f"Удалено активов: {len(to_delete)}"); st.rerun()
 
-# ============ РАЗДЕЛ: АКТИВЫ К IMOEX ============
 if page == "📊 Активы к IMOEX":
     st.subheader("📊 Активы к IMOEX")
     st.caption("Сравнение доходности активов с индексом IMOEX за последние 24 закрытых месяца")
