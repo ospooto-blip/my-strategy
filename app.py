@@ -90,13 +90,13 @@ def find_tickers(query):
         idx_secid = cols.index("secid")
         idx_name = cols.index("name")
         idx_type = cols.index("type")
-        idx_is_traded = cols.index("is_traded") if "is_traded" in cols else None
 
         results = []
         for row in rows:
             secid, name, typ = row[idx_secid], row[idx_name], row[idx_type]
+            # Оставляем только акции
             if typ not in ("common_share", "preferred_share", "exchange_share"): continue
-            if idx_is_traded is not None and row[idx_is_traded] != 1: continue
+            
             type_label = {"common_share": "обычка", "preferred_share": "преф", "exchange_share": "акция"}.get(typ, typ)
             results.append({"label": f"{secid} — {name} ({type_label})", "ticker": secid, "name": name})
         return results
@@ -515,22 +515,46 @@ def get_open_price_first_day_of_month(ticker, is_index=False):
 
 def get_open_price_first_day_of_week(ticker, is_index=False):
     today = date.today()
+    # Находим понедельник текущей недели
     monday = today - pd.Timedelta(days=today.weekday())
-    if hasattr(monday, "date"): monday = monday.date()
+    if hasattr(monday, "date"): 
+        monday = monday.date()
+        
+    # Если запрашиваем в понедельник утром, то данных за сегодня может не быть.
+    # Начнем с прошлого понедельника? Нет, нам нужна цена на начало ТЕКУЩЕЙ недели.
+    
     url = "https://iss.moex.com/iss/history/engines/stock/markets/index/securities/IMOEX.json" if is_index else f"https://iss.moex.com/iss/history/engines/stock/markets/shares/securities/{ticker}.json"
     params = {"from": monday.strftime("%Y-%m-%d"), "till": today.strftime("%Y-%m-%d"), "iss.meta": "off", "start": 0}
+    
     try:
         r = requests.get(url, params=params, timeout=15)
         data = r.json()
         if "history" not in data: return None
+        
         cols, rows = data["history"]["columns"], data["history"]["data"]
         if not rows: return None
+        
         idx_open = cols.index("OPEN") if "OPEN" in cols else None
-        if idx_open is None: return None
+        idx_trade_date = cols.index("TRADEDATE") if "TRADEDATE" in cols else None
+        
+        if idx_open is None or idx_trade_date is None: return None
+        
+        # Перебираем все дни с понедельника. MOEX отдает их по возрастанию.
         for row in rows:
-            if row[idx_open] is not None: return round(float(row[idx_open]), 3)
+            # Превращаем дату в объект datetime, чтобы узнать день недели
+            trade_dt = pd.to_datetime(row[idx_trade_date])
+            
+            # 5 = Суббота, 6 = Воскресенье. Пропускаем их.
+            if trade_dt.weekday() >= 5:
+                continue
+                
+            # Если это будний день и есть цена открытия - берем ее
+            if row[idx_open] is not None:
+                return round(float(row[idx_open]), 3)
+                
         return None
-    except Exception: return None
+    except Exception: 
+        return None
 
 def auto_fill_indicator_fields(ticker):
     try:
@@ -1228,31 +1252,58 @@ if page == "📈 Индикатор":
 
     st.markdown("---")
     with st.expander("➕ Добавить актив", expanded=False):
-        with st.form("ind_form", clear_on_submit=True):
-            query = st.text_input("Введите название (например: Лукойл, Сбер)")
-            selected_ticker, selected_name = None, None
-            if query and len(query) >= 2:
-                found = find_tickers(query)
-                if found:
-                    options = ["— выберите тикер —"] + [f["label"] for f in found]
-                    chosen = st.selectbox("Найдено на MOEX:", options)
-                    if chosen != "— выберите тикер —":
-                        selected = next(f for f in found if f["label"] == chosen)
-                        selected_ticker, selected_name = selected["ticker"], selected["name"]
-                        st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
-                else: st.warning("⚠️ Бумага не найдена на MOEX.")
-            submitted = st.form_submit_button("Добавить актив")
-            if submitted:
-                if selected_ticker is None: st.warning("Выберите тикер")
-                elif not st.session_state.indicator.empty and selected_ticker in st.session_state.indicator["Тикер"].values: st.error(f"❌ Актив {selected_ticker} уже есть в индикаторе!")
+        query = st.text_input("Введите название или тикер (например: Сбер, FESH, ДВМП)")
+        
+        selected_ticker = None
+        selected_name = None
+        
+        if query and len(query) >= 2:
+            found = find_tickers(query)
+            if found:
+                options = ["— выберите тикер —"] + [f["label"] for f in found]
+                chosen = st.selectbox("Найдено на MOEX:", options)
+                if chosen != "— выберите тикер —":
+                    selected = next(f for f in found if f["label"] == chosen)
+                    selected_ticker = selected["ticker"]
+                    selected_name = selected["name"]
+                    st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
+            else:
+                st.warning("⚠️ Бумага не найдена на MOEX.")
+
+        if st.button("Добавить актив", key="ind_add_button"):
+            if selected_ticker is None:
+                st.warning("Сначала выберите тикер из списка")
+            elif not st.session_state.indicator.empty and selected_ticker in st.session_state.indicator["Тикер"].values:
+                st.error(f"❌ Актив {selected_ticker} уже есть в индикаторе!")
+            else:
+                with st.spinner("Загрузка данных с MOEX..."):
+                    auto_data = auto_fill_indicator_fields(selected_ticker)
+
+                if auto_data is None:
+                    st.error("❌ MOEX недоступен или данные не получены. Попробуйте позже.")
                 else:
-                    with st.spinner("Загрузка данных с MOEX..."): auto_data = auto_fill_indicator_fields(selected_ticker)
-                    if auto_data is None: st.error("❌ MOEX недоступен или данные не получены. Попробуйте позже.")
-                    else:
-                        new_row = {"Наименование": selected_name if selected_name else query, "Тикер": selected_ticker, "Вирт. Инвест": 1, "Начало месяца активы": auto_data["Начало месяца активы"], "Начало недели активы": auto_data["Начало недели активы"], "IMOEX сначала месяца": auto_data["IMOEX сначала месяца"], "Начало недели IMOEX": auto_data["Начало недели IMOEX"], "Тек.цена актива": None, "Тек. цена IMOEX": None, "Месяц % к IMOEX": None, "Неделя % к IMOEX": None, "Обновлено_месяц": auto_data["Обновлено_месяц"], "Обновлено_неделя": auto_data["Обновлено_неделя"]}
-                        st.session_state.indicator = pd.concat([st.session_state.indicator, pd.DataFrame([new_row])], ignore_index=True)
-                        save_indicator(st.session_state.indicator)
-                        st.success(f"Добавлено: {selected_name or query}"); st.rerun()
+                    new_row = {
+                        "Наименование": selected_name if selected_name else query,
+                        "Тикер": selected_ticker,
+                        "Вирт. Инвест": 1,
+                        "Начало месяца активы": auto_data["Начало месяца активы"],
+                        "Начало недели активы": auto_data["Начало недели активы"],
+                        "IMOEX сначала месяца": auto_data["IMOEX сначала месяца"],
+                        "Начало недели IMOEX": auto_data["Начало недели IMOEX"],
+                        "Тек.цена актива": None,
+                        "Тек. цена IMOEX": None,
+                        "Месяц % к IMOEX": None,
+                        "Неделя % к IMOEX": None,
+                        "Обновлено_месяц": auto_data["Обновлено_месяц"],
+                        "Обновлено_неделя": auto_data["Обновлено_неделя"],
+                    }
+                    st.session_state.indicator = pd.concat(
+                        [st.session_state.indicator, pd.DataFrame([new_row])],
+                        ignore_index=True
+                    )
+                    save_indicator(st.session_state.indicator)
+                    st.success(f"Добавлено: {selected_name or query}")
+                    st.rerun()
 
     st.subheader("Индикатор по IMOEX")
     if st.session_state.indicator.empty: st.info("Пока пусто. Добавьте первый актив.")
