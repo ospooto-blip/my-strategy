@@ -1252,72 +1252,61 @@ if page == "📈 Индикатор":
 
     st.markdown("---")
     with st.expander("➕ Добавить актив", expanded=False):
-        # Инициализируем память для поля ввода
-        if "ind_search_query" not in st.session_state:
-            st.session_state.ind_search_query = ""
-
-        # Поле ввода, которое помнит текст
-        query = st.text_input(
-            "Введите название или тикер (например: Сбер, FESH, ДВМП)", 
-            value=st.session_state.ind_search_query,
-            key="ind_query_input_widget"
-        )
-        # Сохраняем текст в память при каждом вводе
-        st.session_state.ind_search_query = query
-
-        selected_ticker = None
-        selected_name = None
-        
-        if query and len(query) >= 2:
-            found = find_tickers(query)
-            if found:
-                options = ["— выберите тикер —"] + [f["label"] for f in found]
-                chosen = st.selectbox("Найдено на MOEX:", options, key="ind_ticker_select_widget")
-                if chosen != "— выберите тикер —":
-                    selected = next(f for f in found if f["label"] == chosen)
-                    selected_ticker = selected["ticker"]
-                    selected_name = selected["name"]
-                    st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
-            else:
-                st.warning("⚠️ Бумага не найдена на MOEX.")
-
-        if st.button("Добавить актив", key="ind_add_button"):
-            if selected_ticker is None:
-                st.warning("Сначала выберите тикер из списка")
-            elif not st.session_state.indicator.empty and selected_ticker in st.session_state.indicator["Тикер"].values:
-                st.error(f"❌ Актив {selected_ticker} уже есть в индикаторе!")
-            else:
-                with st.spinner("Загрузка данных с MOEX..."):
-                    auto_data = auto_fill_indicator_fields(selected_ticker)
-
-                if auto_data is None:
-                    st.error("❌ MOEX недоступен или данные не получены. Попробуйте позже.")
+        with st.form("ind_add_form", clear_on_submit=True):
+            query = st.text_input("Введите название или тикер (например: Сбер, FESH, ДВМП)")
+            
+            selected_ticker = None
+            selected_name = None
+            
+            if query and len(query) >= 2:
+                found = find_tickers(query)
+                if found:
+                    options = ["— выберите тикер —"] + [f["label"] for f in found]
+                    chosen = st.selectbox("Найдено на MOEX:", options)
+                    if chosen != "— выберите тикер —":
+                        selected = next(f for f in found if f["label"] == chosen)
+                        selected_ticker = selected["ticker"]
+                        selected_name = selected["name"]
+                        st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
                 else:
-                    new_row = {
-                        "Наименование": selected_name if selected_name else query,
-                        "Тикер": selected_ticker,
-                        "Вирт. Инвест": 1,
-                        "Начало месяца активы": auto_data["Начало месяца активы"],
-                        "Начало недели активы": auto_data["Начало недели активы"],
-                        "IMOEX сначала месяца": auto_data["IMOEX сначала месяца"],
-                        "Начало недели IMOEX": auto_data["Начало недели IMOEX"],
-                        "Тек.цена актива": None,
-                        "Тек. цена IMOEX": None,
-                        "Месяц % к IMOEX": None,
-                        "Неделя % к IMOEX": None,
-                        "Обновлено_месяц": auto_data["Обновлено_месяц"],
-                        "Обновлено_неделя": auto_data["Обновлено_неделя"],
-                    }
-                    st.session_state.indicator = pd.concat(
-                        [st.session_state.indicator, pd.DataFrame([new_row])],
-                        ignore_index=True
-                    )
-                    save_indicator(st.session_state.indicator)
-                    
-                    # Очищаем поиск после успешного добавления
-                    st.session_state.ind_search_query = ""
-                    st.success(f"Добавлено: {selected_name or query}")
-                    st.rerun()
+                    st.warning("⚠️ Бумага не найдена на MOEX.")
+
+            submitted = st.form_submit_button("Добавить актив")
+            
+            if submitted:
+                if selected_ticker is None:
+                    st.warning("Сначала выберите тикер из списка")
+                elif not st.session_state.indicator.empty and selected_ticker in st.session_state.indicator["Тикер"].values:
+                    st.error(f"❌ Актив {selected_ticker} уже есть в индикаторе!")
+                else:
+                    with st.spinner("Загрузка данных с MOEX..."):
+                        auto_data = auto_fill_indicator_fields(selected_ticker)
+
+                    if auto_data is None:
+                        st.error("❌ MOEX недоступен или данные не получены. Попробуйте позже.")
+                    else:
+                        new_row = {
+                            "Наименование": selected_name if selected_name else query,
+                            "Тикер": selected_ticker,
+                            "Вирт. Инвест": 1,
+                            "Начало месяца активы": auto_data["Начало месяца активы"],
+                            "Начало недели активы": auto_data["Начало недели активы"],
+                            "IMOEX сначала месяца": auto_data["IMOEX сначала месяца"],
+                            "Начало недели IMOEX": auto_data["Начало недели IMOEX"],
+                            "Тек.цена актива": None,
+                            "Тек. цена IMOEX": None,
+                            "Месяц % к IMOEX": None,
+                            "Неделя % к IMOEX": None,
+                            "Обновлено_месяц": auto_data["Обновлено_месяц"],
+                            "Обновлено_неделя": auto_data["Обновлено_неделя"],
+                        }
+                        st.session_state.indicator = pd.concat(
+                            [st.session_state.indicator, pd.DataFrame([new_row])],
+                            ignore_index=True
+                        )
+                        save_indicator(st.session_state.indicator)
+                        st.success(f"Добавлено: {selected_name or query}")
+                        st.rerun()
 
     st.subheader("Индикатор по IMOEX")
     if st.session_state.indicator.empty: st.info("Пока пусто. Добавьте первый актив.")
@@ -1361,58 +1350,51 @@ if page == "📊 Активы к IMOEX":
 
     st.markdown("---")
     with st.expander("➕ Добавить актив", expanded=False):
-        if "aimoex_search_query" not in st.session_state:
-            st.session_state.aimoex_search_query = ""
+        with st.form("aimoex_add_form", clear_on_submit=True):
+            query = st.text_input("Введите название или тикер (например: Сбер, FESH, ДВМП)")
+            
+            selected_ticker = None
+            selected_name = None
+            
+            if query and len(query) >= 2:
+                found = find_tickers(query)
+                if found:
+                    options = ["— выберите тикер —"] + [f["label"] for f in found]
+                    chosen = st.selectbox("Найдено на MOEX:", options)
+                    if chosen != "— выберите тикер —":
+                        selected = next(f for f in found if f["label"] == chosen)
+                        selected_ticker = selected["ticker"]
+                        selected_name = selected["name"]
+                        st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
+                else:
+                    st.warning("⚠️ Бумага не найдена на MOEX.")
 
-        query = st.text_input(
-            "Введите название или тикер (например: Сбер, FESH, ДВМП)", 
-            value=st.session_state.aimoex_search_query,
-            key="aimoex_query_input_widget"
-        )
-        st.session_state.aimoex_search_query = query
+            submitted = st.form_submit_button("Добавить актив")
+            
+            if submitted:
+                if selected_ticker is None:
+                    st.warning("Сначала выберите тикер из списка")
+                elif selected_ticker in st.session_state.assets_to_imoex["Тикер"].values:
+                    st.warning("Этот актив уже добавлен")
+                else:
+                    new_row = {
+                        "Тикер": selected_ticker,
+                        "Наименование": selected_name if selected_name else query,
+                        "Добавлено": date.today(),
+                    }
+                    st.session_state.assets_to_imoex = pd.concat(
+                        [st.session_state.assets_to_imoex, pd.DataFrame([new_row])],
+                        ignore_index=True
+                    )
+                    save_assets(st.session_state.assets_to_imoex)
 
-        selected_ticker = None
-        selected_name = None
-        
-        if query and len(query) >= 2:
-            found = find_tickers(query)
-            if found:
-                options = ["— выберите тикер —"] + [f["label"] for f in found]
-                chosen = st.selectbox("Найдено на MOEX:", options, key="aimoex_ticker_select_widget")
-                if chosen != "— выберите тикер —":
-                    selected = next(f for f in found if f["label"] == chosen)
-                    selected_ticker = selected["ticker"]
-                    selected_name = selected["name"]
-                    st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
-            else:
-                st.warning("⚠️ Бумага не найдена на MOEX.")
+                    with st.spinner("Загрузка истории с MOEX..."):
+                        tickers = st.session_state.assets_to_imoex["Тикер"].dropna().unique().tolist()
+                        cache = refresh_history_cache(tickers, force=True)
+                        st.session_state.history_cache = cache
 
-        if st.button("Добавить актив", key="aimoex_add_button"):
-            if selected_ticker is None:
-                st.warning("Сначала выберите тикер из списка")
-            elif selected_ticker in st.session_state.assets_to_imoex["Тикер"].values:
-                st.warning("Этот актив уже добавлен")
-            else:
-                new_row = {
-                    "Тикер": selected_ticker,
-                    "Наименование": selected_name if selected_name else query,
-                    "Добавлено": date.today(),
-                }
-                st.session_state.assets_to_imoex = pd.concat(
-                    [st.session_state.assets_to_imoex, pd.DataFrame([new_row])],
-                    ignore_index=True
-                )
-                save_assets(st.session_state.assets_to_imoex)
-
-                with st.spinner("Загрузка истории с MOEX..."):
-                    tickers = st.session_state.assets_to_imoex["Тикер"].dropna().unique().tolist()
-                    cache = refresh_history_cache(tickers, force=True)
-                    st.session_state.history_cache = cache
-
-                # Очищаем поиск после успешного добавления
-                st.session_state.aimoex_search_query = ""
-                st.success(f"Добавлено и загружено: {selected_name or query}")
-                st.rerun()
+                    st.success(f"Добавлено и загружено: {selected_name or query}")
+                    st.rerun()
 
     st.subheader("Сравнение с IMOEX")
     if st.session_state.assets_to_imoex.empty: st.info("Пока пусто. Добавьте актив.")
