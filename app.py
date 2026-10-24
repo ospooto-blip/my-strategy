@@ -759,7 +759,7 @@ if page == "💼 Портфель":
             st.session_state.show_deposit_form = False
             st.rerun()
     with col_refresh:
-        if st.button("🔄 Цены", key="refresh_portfolio", use_container_width=True):
+        if st.button("🔄 Обновить данные", key="refresh_portfolio", use_container_width=True):
             get_imoex.clear(); get_stock_price.clear(); st.rerun()
 
     if st.session_state.get("show_deposit_form"):
