@@ -94,7 +94,6 @@ def find_tickers(query):
         results = []
         for row in rows:
             secid, name, typ = row[idx_secid], row[idx_name], row[idx_type]
-            # Оставляем только акции
             if typ not in ("common_share", "preferred_share", "exchange_share"): continue
             
             type_label = {"common_share": "обычка", "preferred_share": "преф", "exchange_share": "акция"}.get(typ, typ)
@@ -515,14 +514,10 @@ def get_open_price_first_day_of_month(ticker, is_index=False):
 
 def get_open_price_first_day_of_week(ticker, is_index=False):
     today = date.today()
-    # Находим понедельник текущей недели
     monday = today - pd.Timedelta(days=today.weekday())
     if hasattr(monday, "date"): 
         monday = monday.date()
         
-    # Если запрашиваем в понедельник утром, то данных за сегодня может не быть.
-    # Начнем с прошлого понедельника? Нет, нам нужна цена на начало ТЕКУЩЕЙ недели.
-    
     url = "https://iss.moex.com/iss/history/engines/stock/markets/index/securities/IMOEX.json" if is_index else f"https://iss.moex.com/iss/history/engines/stock/markets/shares/securities/{ticker}.json"
     params = {"from": monday.strftime("%Y-%m-%d"), "till": today.strftime("%Y-%m-%d"), "iss.meta": "off", "start": 0}
     
@@ -539,19 +534,12 @@ def get_open_price_first_day_of_week(ticker, is_index=False):
         
         if idx_open is None or idx_trade_date is None: return None
         
-        # Перебираем все дни с понедельника. MOEX отдает их по возрастанию.
         for row in rows:
-            # Превращаем дату в объект datetime, чтобы узнать день недели
             trade_dt = pd.to_datetime(row[idx_trade_date])
-            
-            # 5 = Суббота, 6 = Воскресенье. Пропускаем их.
             if trade_dt.weekday() >= 5:
                 continue
-                
-            # Если это будний день и есть цена открытия - берем ее
             if row[idx_open] is not None:
                 return round(float(row[idx_open]), 3)
-                
         return None
     except Exception: 
         return None
@@ -608,8 +596,9 @@ def is_cache_fresh():
     try:
         last = pd.to_datetime(cache["Обновлено"], errors="coerce").max()
         if pd.isna(last): return False
-        return last.date() == date.today()
-    except Exception: return False
+        return (datetime.now() - last.to_pydatetime()).total_seconds() < 86400
+    except Exception: 
+        return False
 
 def get_month_last_day(year, month):
     if month == 12: return date(year, 12, 31)
@@ -1180,15 +1169,24 @@ if page == "🗑 Корзина":
         st.markdown("---")
         st.warning("⚠️ **Служебные действия**")
         if st.button("🧹 Удалить покупки без пополнений", key="clean_orphans"):
+            st.info("Внимание: удаляются только те покупки, у которых нет родительского пополнения. Если вы планируете восстанавливать пополнение из Корзины, сначала восстановите его.")
             count = find_and_clean_orphan_purchases()
             if count > 0: st.success(f"Найдено и удалено «фантомных» покупок: {count}."); st.rerun()
             else: st.info("Фантомных покупок не найдено. Всё чисто!")
 
         if st.button("🔥 Очистить корзину навсегда", key="clear_trash"):
+            deleted_sale_ids = st.session_state.sales[st.session_state.sales["Удалено"] == True]["Sale_ID"].dropna().astype(int).tolist()
             st.session_state.transactions = st.session_state.transactions[st.session_state.transactions["Удалено"] == False].reset_index(drop=True)
             st.session_state.purchases = st.session_state.purchases[st.session_state.purchases["Удалено"] == False].reset_index(drop=True)
             st.session_state.sales = st.session_state.sales[st.session_state.sales["Удалено"] == False].reset_index(drop=True)
-            save_transactions(st.session_state.transactions); save(st.session_state.purchases, PURCHASES_FILE); save(st.session_state.sales, SALES_FILE)
+            if deleted_sale_ids and not st.session_state.distribution.empty:
+                st.session_state.distribution = st.session_state.distribution[~st.session_state.distribution["Sale_ID"].astype(float).isin(deleted_sale_ids)].reset_index(drop=True)
+            
+            # Очищаем кэш истории
+            st.session_state.history_cache = pd.DataFrame(columns=HISTORY_COLUMNS)
+            save_history_cache(st.session_state.history_cache)
+            
+            save_transactions(st.session_state.transactions); save(st.session_state.purchases, PURCHASES_FILE); save(st.session_state.sales, SALES_FILE); save_distribution(st.session_state.distribution)
             st.success("Корзина очищена. Данные удалены навсегда."); st.rerun()
 
 if page == "📊 История продаж":
@@ -1253,23 +1251,28 @@ if page == "📈 Индикатор":
     st.markdown("---")
     with st.expander("➕ Добавить актив", expanded=False):
         with st.form("ind_add_form", clear_on_submit=True):
-            query = st.text_input("Введите название или тикер (например: Сбер, FESH, ДВМП)")
-            
+            col1, col2 = st.columns(2)
+            with col1:
+                query = st.text_input("Введите название (например: Сбер)")
+                
             selected_ticker = None
             selected_name = None
+            chosen = "— выберите тикер —"
             
             if query and len(query) >= 2:
                 found = find_tickers(query)
                 if found:
-                    options = ["— выберите тикер —"] + [f["label"] for f in found]
-                    chosen = st.selectbox("Найдено на MOEX:", options)
+                    with col2:
+                        options = ["— выберите тикер —"] + [f["label"] for f in found]
+                        chosen = st.selectbox("Найдено на MOEX:", options)
                     if chosen != "— выберите тикер —":
                         selected = next(f for f in found if f["label"] == chosen)
                         selected_ticker = selected["ticker"]
                         selected_name = selected["name"]
                         st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
                 else:
-                    st.warning("⚠️ Бумага не найдена на MOEX.")
+                    with col2:
+                        st.warning("⚠️ Не найдено")
 
             submitted = st.form_submit_button("Добавить актив")
             
@@ -1351,23 +1354,28 @@ if page == "📊 Активы к IMOEX":
     st.markdown("---")
     with st.expander("➕ Добавить актив", expanded=False):
         with st.form("aimoex_add_form", clear_on_submit=True):
-            query = st.text_input("Введите название или тикер (например: Сбер, FESH, ДВМП)")
-            
+            col1, col2 = st.columns(2)
+            with col1:
+                query = st.text_input("Введите название (например: Сбер)")
+                
             selected_ticker = None
             selected_name = None
+            chosen = "— выберите тикер —"
             
             if query and len(query) >= 2:
                 found = find_tickers(query)
                 if found:
-                    options = ["— выберите тикер —"] + [f["label"] for f in found]
-                    chosen = st.selectbox("Найдено на MOEX:", options)
+                    with col2:
+                        options = ["— выберите тикер —"] + [f["label"] for f in found]
+                        chosen = st.selectbox("Найдено на MOEX:", options)
                     if chosen != "— выберите тикер —":
                         selected = next(f for f in found if f["label"] == chosen)
                         selected_ticker = selected["ticker"]
                         selected_name = selected["name"]
                         st.caption(f"✅ Тикер: `{selected_ticker}` — {selected_name}")
                 else:
-                    st.warning("⚠️ Бумага не найдена на MOEX.")
+                    with col2:
+                        st.warning("⚠️ Не найдено")
 
             submitted = st.form_submit_button("Добавить актив")
             
